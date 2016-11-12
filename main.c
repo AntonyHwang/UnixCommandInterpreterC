@@ -17,8 +17,8 @@
 
 #define MAX_BUFF_SIZE 1024
 
-char path[80];
-char home[80];
+char path[MAX_BUFF_SIZE];
+char home[MAX_BUFF_SIZE];
 
 struct command {
     char *program;
@@ -42,17 +42,14 @@ bool loadConfigFile() {
         exit(1);
     }
     while(1) {
-        char buffer[80];
+        char buffer[MAX_BUFF_SIZE];
         
-        fgets (buffer, 80, pfile);
-        //printf("%s\n", buffer);
+        fgets (buffer, MAX_BUFF_SIZE, pfile);
         if (prefix("PATH=", buffer)) {
             strncpy(path, buffer + 5, strlen(buffer) - 5);
-            //printf("path: %s", path);
         }
         else if (prefix("HOME=", buffer)) {
             strncpy(home, buffer + 5, strlen(buffer) - 5);
-            //printf("home: %s", home);;
         }
         if (feof(pfile)) {
             if (strlen(path) == 0 || strlen(home) == 0) {
@@ -68,17 +65,20 @@ bool loadConfigFile() {
 
 void cd_(struct command c) {
     char cwd[MAX_BUFF_SIZE];
-    getcwd(cwd, sizeof(cwd));
-    strcat(cwd, "/");
-    strcat(cwd, c.arg);
+    if (c.arg == NULL) {
+        strcat(cwd, home);
+        printf("%s\n", cwd);
+    }
+    else {
+        getcwd(cwd, sizeof(cwd));
+        strcat(cwd, "/");
+        strcat(cwd, c.arg);
+    }
     
     int status = chdir(cwd);
     if (status != 0) {
-        printf("Failed to change directory\n");
+        printf("No such file or directory\n");
     }
-    /*{
-        printf("Failed to change directory\n");
-    }*/
 }
 
 void ls_(struct command c) {
@@ -90,14 +90,15 @@ void cat_(struct command c) {
     char *filename = c.arg;
     file = fopen(filename, "r");
     if (file == NULL) {
-        printf("File \"%s\" does not exist\n", filename);
+        printf("No such file or directory", filename);
         exit(1);
     }
-    while(1) {
+    while(!feof(file)) {
         char buffer[MAX_BUFF_SIZE];
         fgets (buffer, MAX_BUFF_SIZE, file);
-        printf("%s/n", buffer);
+        printf("%s", buffer);
     }
+    printf("\n");
     fclose(file);
 }
 
@@ -115,7 +116,7 @@ void runCommand(struct command c) {
         cat_(c);
     }
     else {
-        printf("invalid command\n");
+        printf("command not found\n");
         exit(1);
     }
 }
