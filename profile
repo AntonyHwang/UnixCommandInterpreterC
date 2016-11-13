@@ -1,2 +1,2 @@
 PATH=/bin:/usr/bin:/usr/local/bin
-HOME=/home/os
+HOME=/Users/AntonyHwang

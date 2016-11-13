@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <dirent.h>
 
 #define MAX_BUFF_SIZE 1024
@@ -20,11 +21,7 @@
 char path[MAX_BUFF_SIZE];
 char home[MAX_BUFF_SIZE];
 
-struct command {
-    char *program;
-    char *arg;
-    char *arg2;
-};
+char **paths;
 
 int prefix(const char *pre, const char *str)
 {
@@ -63,99 +60,75 @@ bool loadConfigFile() {
     fclose(pfile);
 }
 
-void cd_(struct command c) {
-    char cwd[MAX_BUFF_SIZE];
-    if (c.arg == NULL) {
-        strcat(cwd, home);
-        printf("%s\n", cwd);
-    }
-    else {
-        getcwd(cwd, sizeof(cwd));
-        strcat(cwd, "/");
-        strcat(cwd, c.arg);
-    }
-    
-    int status = chdir(cwd);
-    if (status != 0) {
-        printf("No such file or directory\n");
-    }
-}
-
-void ls_(struct command c) {
-    
-}
-
-void cat_(struct command c) {
-    FILE *file;
-    char *filename = c.arg;
-    file = fopen(filename, "r");
-    if (file == NULL) {
-        printf("No such file or directory", filename);
-        exit(1);
-    }
-    while(!feof(file)) {
-        char buffer[MAX_BUFF_SIZE];
-        fgets (buffer, MAX_BUFF_SIZE, file);
-        printf("%s", buffer);
-    }
-    printf("\n");
-    fclose(file);
-}
-
-void runCommand(struct command c) {
-    char *cd = "cd";
-    char *ls = "ls";
-    char *cat = "cat";
-    if (strcmp(c.program, cd) == 0) {
-        cd_(c);
-    }
-    else if (strcmp(c.program, ls) == 0) {
-        ls_(c);
-    }
-    else if (strcmp(c.program, cat) == 0) {
-        cat_(c);
-    }
-    else {
-        printf("command not found\n");
-        exit(1);
-    }
-}
-
-void getProgramArg() {
-    char input[MAX_BUFF_SIZE];
-    fgets(input, MAX_BUFF_SIZE, stdin);
+void getSearchPath() {
     char *token;
-    int wordCount = 1;
-    struct command c;
-    c.program = malloc(sizeof(char) * MAX_BUFF_SIZE);
-    c.arg = malloc(sizeof(char) * MAX_BUFF_SIZE);
-    c.arg2 = malloc(sizeof(char) * MAX_BUFF_SIZE);
-    token = strtok(input, " \n\t");
-    c.program = token;
+    int counter = 0;
+    paths = malloc(sizeof(char) * MAX_BUFF_SIZE);
+    token = strtok(path, ":");
     while (token != NULL)
     {
-        wordCount++;
+        paths[counter] = token;
+        counter++;
+        token = strtok(NULL, "\n:");
+    }
+}
+
+int runProgramArg() {
+    int found = 0;
+    char *input = malloc( MAX_BUFF_SIZE * sizeof( char* ));
+    char **command = malloc( MAX_BUFF_SIZE * sizeof( char* ));
+
+    fgets(input, MAX_BUFF_SIZE, stdin);
+    char *token;
+    int counter = 0;
+    token = strtok(input, " \n\t");
+    while (token != NULL)
+    {
+        command[counter] = token;
+        counter++;
         token = strtok(NULL, " \n\t");
-        //printf ("%s\n",token);
-        if (wordCount == 2) {
-            c.arg = token;
+    }
+    for (int i = 0; i < MAX_BUFF_SIZE; i++) {
+        char *buffer;
+        buffer = malloc(sizeof(char) * MAX_BUFF_SIZE);
+        strcpy(buffer, paths[i]);
+        strcat(buffer, "/");
+        strcat(buffer, command[0]);
+        if (strlen(paths[i]) == 0) {
+            break;
         }
-        else if (wordCount == 3) {
-            c.arg2 = token;
+        
+        if (access(buffer, X_OK) == 0) {
+            printf("found\n");
+            if (fork() != 0) {
+                wait(NULL);
+            }
+            else {
+                execv(buffer, command);
+            }
+            found = 1;
+            free(buffer);
+            free(command);
+            free(input);
+            break;
         }
     }
-    runCommand(c);
+    if (found == 0) {
+        printf("command not found\n");
+        free(command);
+        free(input);
+    }
+    if (fork() != 0) {
+        wait(NULL);
+    }
+    return 1;
 }
 
 void runShell () {
     bool commandInput = 0;
+    getSearchPath();
     do {
         commandInput = 0;
-        struct command c;
-        c.program = malloc(sizeof(char) * MAX_BUFF_SIZE);
-        c.arg = malloc(sizeof(char) * MAX_BUFF_SIZE);
-        c.arg2 = malloc(sizeof(char) * MAX_BUFF_SIZE);
-        
         char cwd[MAX_BUFF_SIZE];
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
             fprintf(stdout, "%s>", cwd);
@@ -163,12 +136,7 @@ void runShell () {
         else {
             perror("Error: current directory not found");
         }
-        getProgramArg();
-        commandInput = 1;
-        //args = getArgs(input);
-        //findProgram =
-        //forkProgram =
-        //executeProgram
+        commandInput = runProgramArg();
     } while (commandInput);
 }
 
