@@ -44,9 +44,11 @@ bool loadConfigFile() {
         fgets (buffer, MAX_BUFF_SIZE, pfile);
         if (prefix("PATH=", buffer)) {
             strncpy(path, buffer + 5, strlen(buffer) - 5);
+            strtok(path, "\n");
         }
         else if (prefix("HOME=", buffer)) {
             strncpy(home, buffer + 5, strlen(buffer) - 5);
+            strtok(home, "\n");
         }
         if (feof(pfile)) {
             if (strlen(path) == 0 || strlen(home) == 0) {
@@ -64,8 +66,10 @@ bool loadConfigFile() {
 void getSearchPath() {
     char *token;
     int counter = 0;
+    char *pathCopy = malloc( MAX_BUFF_SIZE * sizeof( char* ));
+    strcpy(pathCopy, path);
     paths = malloc(sizeof(char) * MAX_BUFF_SIZE);
-    token = strtok(path, ":");
+    token = strtok(pathCopy, "\n:");
     while (token != NULL)
     {
         paths[counter] = token;
@@ -84,30 +88,43 @@ void cd(char **arg) {
         getcwd(cwd, sizeof(cwd));
         strcat(cwd, "/");
         strcat(cwd, arg[1]);
+        printf("%s\n", cwd);
     }
     int status = chdir(cwd);
     if (status != 0) {
-        printf("Failed to change directory\n");
         printf("No such file or directory\n");
     }
 }
 
-int launchCommand(char *buffer, char **command) {
-    pid_t pid = fork();
+void chHome(char *arg) {
+    char *newHome = malloc(sizeof(arg) - 5);
+    strncpy(newHome, arg + 6, strlen(arg) - 6);
+    strtok(newHome, "\n");
+    strcpy(home, newHome);
+}
 
-    if (pid == -1)
-    {
-        printf("fork failed");
-    }
-    else if (pid > 0)
-    {
-        int status;
-        waitpid(pid, &status, 0);
-    }
-    else
-    {
+void chPath(char *arg) {
+    char *newPath = malloc(sizeof(arg) - 5);
+    strncpy(newPath, arg + 6, strlen(arg) - 6);
+    strtok(newPath, "\n");
+    strcpy(path, newPath);
+}
+
+int launchCommand(char *buffer, char **command) {
+    pid_t pid;
+    int status;
+    
+    pid = fork();
+    if (pid == 0) {
+        // Child process
         execv(buffer, command);
+    } else {
+        // Parent process
+        do {
+            waitpid(pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
     }
+    
     return 1;
 }
 
@@ -118,8 +135,10 @@ int runProgramArg() {
     char *token;
     int counter = 0;
     token = strtok(input, " \n\t");
-    while (token != NULL)
-    {
+    if (strcmp(input, "\n") == 0) {
+        return 1;
+    }
+    while (token != NULL) {
         command[counter] = token;
         counter++;
         token = strtok(NULL, " \n\t");
@@ -127,8 +146,22 @@ int runProgramArg() {
     if (strcmp(command[0], "cd") == 0) {
         command[counter] = " ";
         cd(command);
-        free(command);
-        free(input);
+        return 1;
+    }
+    else if (strncmp(command[0], "$HOME=", 6) == 0) {
+        chHome(command[0]);
+        return 1;
+    }
+    else if (strncmp(command[0], "$PATH=", 6) == 0) {
+        chPath(command[0]);
+        return 1;
+    }
+    else if (strcmp(command[0], "$HOME") == 0) {
+        printf("%s: is a directory\n", home);
+        return 1;
+    }
+    else if (strcmp(command[0], "$PATH") == 0) {
+        printf("%s\n", path);
         return 1;
     }
     else {
@@ -139,8 +172,6 @@ int runProgramArg() {
             strcat(buffer, command[0]);
             if (access(buffer, X_OK) == 0) {
                 int status = launchCommand(buffer, command);
-                free(command);
-                free(input);
                 return status;
             }
             if (strcmp(paths[i], " ")) {
@@ -155,11 +186,10 @@ int runProgramArg() {
 }
 
 void runShell () {
-
+    char cwd[MAX_BUFF_SIZE];
     int commandInput = 0;
     getSearchPath();
     do {
-        char cwd[MAX_BUFF_SIZE] = "";
         commandInput = 0;
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
             printf("%s>", cwd);
