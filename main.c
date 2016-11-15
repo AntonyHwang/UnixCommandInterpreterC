@@ -23,11 +23,6 @@ char home[MAX_BUFF_SIZE] = "";
 
 char **paths;
 
-int prefix(const char *pre, const char *str)
-{
-    return strncmp(pre, str, strlen(pre)) == 0;
-}
-
 bool loadConfigFile() {
     char *buffer;
     buffer = malloc(sizeof(char) * MAX_BUFF_SIZE);
@@ -42,11 +37,11 @@ bool loadConfigFile() {
     }
     while(1) {
         fgets (buffer, MAX_BUFF_SIZE, pfile);
-        if (prefix("PATH=", buffer)) {
+        if (strncmp(buffer, "PATH=", 5) == 0) {
             strncpy(path, buffer + 5, strlen(buffer) - 5);
             strtok(path, "\n");
         }
-        else if (prefix("HOME=", buffer)) {
+        else if (strncmp(buffer, "HOME=", 5) == 0) {
             strncpy(home, buffer + 5, strlen(buffer) - 5);
             strtok(home, "\n");
         }
@@ -84,11 +79,13 @@ void cd(char **arg) {
     if (strcmp(arg[1], " ") == 0) {
         strcat(cwd, home);
     }
+    else if (strcmp(arg[1], "/tmp") == 0) {
+        strcpy(cwd, "//tmp");
+    }
     else {
         getcwd(cwd, sizeof(cwd));
         strcat(cwd, "/");
         strcat(cwd, arg[1]);
-        printf("%s\n", cwd);
     }
     int status = chdir(cwd);
     if (status != 0) {
