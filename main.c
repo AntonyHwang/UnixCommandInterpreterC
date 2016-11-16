@@ -22,7 +22,7 @@ char path[MAX_BUFF_SIZE] = "";
 char home[MAX_BUFF_SIZE] = "";
 
 char **paths;
-
+//loads the profile file in the executable directory
 bool loadConfigFile() {
     char *buffer;
     buffer = malloc(sizeof(char) * MAX_BUFF_SIZE);
@@ -30,13 +30,18 @@ bool loadConfigFile() {
     char *filename = "profile";
     int pathAssigned = 0;
     int homeAssigned = 0;
+    //opens the file
     pfile = fopen(filename, "r");
+    //check existence of file
     if (pfile == NULL) {
         printf("File \"%s\" does not exist\n", filename);
         exit(1);
     }
+    //read line by line
     while(1) {
         fgets (buffer, MAX_BUFF_SIZE, pfile);
+        //extract path and home
+        //by checking the start of each line
         if (strncmp(buffer, "PATH=", 5) == 0) {
             strncpy(path, buffer + 5, strlen(buffer) - 5);
             strtok(path, "\n");
@@ -57,7 +62,7 @@ bool loadConfigFile() {
     }
     fclose(pfile);
 }
-
+//extract search paths and separate them into tokens (array of strings)
 void getSearchPath() {
     char *token;
     int counter = 0;
@@ -73,7 +78,7 @@ void getSearchPath() {
     }
     paths[counter] = " ";
 }
-
+//reading the arguments after cd
 void cd(char **arg) {
     char cwd[MAX_BUFF_SIZE] = "";
     if (strcmp(arg[1], " ") == 0) {
@@ -87,48 +92,55 @@ void cd(char **arg) {
         strcat(cwd, "/");
         strcat(cwd, arg[1]);
     }
+    //change the directory
+    //check if its successful
     int status = chdir(cwd);
     if (status != 0) {
         printf("No such file or directory\n");
     }
 }
-
+//reading the arguments after $HOME=
 void chHome(char *arg) {
     char *newHome = malloc(sizeof(arg) - 5);
     strncpy(newHome, arg + 6, strlen(arg) - 6);
     strtok(newHome, "\n");
+    //replace the old home directory with the new home directory
     strcpy(home, newHome);
 }
-
+//reading the arguments after $PATH=
 void chPath(char *arg) {
     char *newPath = malloc(sizeof(arg) - 5);
     strncpy(newPath, arg + 6, strlen(arg) - 6);
     strtok(newPath, "\n");
+    //replace the old path with the new path
     strcpy(path, newPath);
 }
 
 int launchCommand(char *buffer, char **command) {
+    //get the current process id
     pid_t pid;
     int status;
-    
+    //duplicate the process
     pid = fork();
     if (pid == 0) {
-        // Child process
+        // child process
         execv(buffer, command);
     } else {
-        // Parent process
+        // parent process
         do {
             waitpid(pid, &status, WUNTRACED);
+            //wait until the child process finishes
         } while (!WIFEXITED(status) && !WIFSIGNALED(status));
     }
     
     return 1;
 }
-
+//reading the command input by the user
 int runProgramArg() {
     char *input = malloc( MAX_BUFF_SIZE * sizeof( char* ));
     char **command = malloc( MAX_BUFF_SIZE * sizeof( char* ));
     fgets(input, MAX_BUFF_SIZE, stdin);
+    //extract tokens from the string input by the user
     char *token;
     int counter = 0;
     token = strtok(input, " \n\t");
@@ -140,6 +152,8 @@ int runProgramArg() {
         counter++;
         token = strtok(NULL, " \n\t");
     }
+    //getting the program name and compare
+    //to decide with program to look for and run
     if (strcmp(command[0], "cd") == 0) {
         command[counter] = " ";
         cd(command);
@@ -162,11 +176,13 @@ int runProgramArg() {
         return 1;
     }
     else {
+        //search the program through all the paths defined in the profile file
         for (int i = 0; i < MAX_BUFF_SIZE; i++) {
             char buffer[MAX_BUFF_SIZE] = "";
             strcpy(buffer, paths[i]);
             strcat(buffer, "/");
             strcat(buffer, command[0]);
+            //if program found run the program with all the arguments
             if (access(buffer, X_OK) == 0) {
                 int status = launchCommand(buffer, command);
                 return status;
@@ -188,6 +204,7 @@ void runShell () {
     getSearchPath();
     do {
         commandInput = 0;
+        //get the current working directory
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
             printf("%s>", cwd);
         }
@@ -199,6 +216,7 @@ void runShell () {
 }
 
 int main() {
+    //print error message if the profile is not found
     if (loadConfigFile() == false) {
         printf("profile does not exist or if either variable is not assigned");
         return 1;
