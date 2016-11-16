@@ -1,0 +1,3 @@
+1.run the makefile
+	OR use gcc main.c -o main
+2.execute the program through command line using ./main
