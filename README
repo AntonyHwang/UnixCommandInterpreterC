@@ -1,3 +1,5 @@
-1.run the makefile
+1.run the makefile make
 	OR use gcc main.c -o main
 2.execute the program through command line using ./main
+
+NOTE: the profile’s path and home is the same as stated in the frontal, you may want to replace the profile file, if home or path is different on the system.

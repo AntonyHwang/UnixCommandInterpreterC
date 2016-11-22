@@ -58,8 +58,8 @@ bool loadConfigFile() {
                 return true;
             }
         }
-        free(buffer);
     }
+    free(buffer);
     fclose(pfile);
 }
 //extract search paths and separate them into tokens (array of strings)
@@ -104,8 +104,14 @@ void chHome(char *arg) {
     char *newHome = malloc(sizeof(arg) - 5);
     strncpy(newHome, arg + 6, strlen(arg) - 6);
     strtok(newHome, "\n");
-    //replace the old home directory with the new home directory
-    strcpy(home, newHome);
+    if (access(newHome, X_OK) == 0){
+        //replace the old home directory with the new home directory
+        strcpy(home, newHome);
+        printf("New HOME assigned\n");
+    }
+    else {
+        printf("HOME not assigned: home path does not exist\n");
+    }
 }
 //reading the arguments after $PATH=
 void chPath(char *arg) {
@@ -114,6 +120,7 @@ void chPath(char *arg) {
     strtok(newPath, "\n");
     //replace the old path with the new path
     strcpy(path, newPath);
+    printf("New PATH assigned\n");
 }
 
 int launchCommand(char *buffer, char **command) {
@@ -177,7 +184,8 @@ int runProgramArg() {
     }
     else {
         //search the program through all the paths defined in the profile file
-        for (int i = 0; i < MAX_BUFF_SIZE; i++) {
+        int i = 0;
+        for (i = 0; i < MAX_BUFF_SIZE; i++) {
             char buffer[MAX_BUFF_SIZE] = "";
             strcpy(buffer, paths[i]);
             strcat(buffer, "/");
@@ -222,8 +230,13 @@ int main() {
         return 1;
     }
     else {
-        chdir(home);
-        runShell();
+        if (chdir(home) == 0) {
+            runShell();
+        }
+        else {
+            printf("profile home path does not exist: need change profile home to a valid path\n");
+            return 1;
+        }
     }
   return 1;
 }
